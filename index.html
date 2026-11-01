@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#123b32">
+  <meta name="description" content="دفتر الحجوزات وإدارة بيانات الزبائن">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png">
+  <title>دفتر الحجوزات</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:#17211e;background:#f3f6f4}
+    *{box-sizing:border-box}body{margin:0}header{background:#123b32;color:white;padding:22px 16px 18px;box-shadow:0 2px 10px #0002}
+    header h1{font-size:23px;margin:0 0 5px}header p{margin:0;color:#d4e5df;font-size:13px}
+    main{max-width:900px;margin:18px auto;padding:0 13px 40px}
+    .panel{background:white;border:1px solid #e0e8e3;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 3px 12px #163c2d0a}
+    h2{font-size:17px;margin:0 0 13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    label{display:block;font-size:13px;color:#52635c;margin-bottom:5px}input,textarea{width:100%;border:1px solid #cfdad3;border-radius:10px;padding:12px;font:inherit;background:#fff;color:#17211e;min-width:0}
+    textarea{min-height:80px;resize:vertical}.wide{grid-column:1/-1}
+    button{border:0;border-radius:10px;padding:11px 15px;font:inherit;font-weight:650;cursor:pointer}
+    .primary{background:#176b50;color:#fff}.soft{background:#e8f1ec;color:#17523f}.danger{background:#fff0ee;color:#a12b20}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.search{margin-bottom:12px}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;color:#486158;font-size:13px;margin-bottom:12px}
+    .record{border:1px solid #e1e9e4;border-radius:12px;padding:13px;margin-top:9px}
+    .record strong{font-size:16px}.muted{color:#63746c;font-size:13px;line-height:1.7}
+    .record-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .empty{text-align:center;color:#75847d;padding:24px 8px}
+    @media(max-width:560px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}header h1{font-size:21px}}
+  </style>
+</head>
+<body>
+<header><h1>دفتر الحجوزات</h1><p>إدارة بيانات الزبائن والحجوزات بسهولة</p></header>
+<main>
+  <section class="panel">
+    <h2 id="formTitle">إضافة زبون</h2>
+    <form id="customerForm">
+      <div class="grid">
+        <div><label for="name">الاسم</label><input id="name" autocomplete="name" required placeholder="اسم الزبون"></div>
+        <div><label for="phone">رقم الهاتف</label><input id="phone" inputmode="tel" placeholder="07xxxxxxxxx" required></div>
+        <div><label for="province">المحافظة</label><input id="province" placeholder="مثلاً بغداد"></div>
+        <div><label for="area">المنطقة</label><input id="area" placeholder="اسم المنطقة"></div>
+        <div class="wide"><label for="address">العنوان التفصيلي</label><textarea id="address" placeholder="الشارع، أقرب نقطة دالة..."></textarea></div>
+      </div>
+      <div class="actions"><button class="primary" type="submit" id="saveBtn">حفظ الزبون</button><button class="soft" type="button" id="cancelEdit" hidden>إلغاء التعديل</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>إضافة أرقام متعددة</h2>
+    <label for="bulk">الصق الأرقام، كل رقم بسطر</label>
+    <textarea id="bulk" placeholder="07xxxxxxxxx&#10;07xxxxxxxxx"></textarea>
+    <div class="actions"><button class="soft" id="addBulk" type="button">إضافة الأرقام</button></div>
+    <p class="muted">كل رقم يُضاف كسجل مستقل، ويمكنك إكمال بياناته لاحقاً.</p>
+  </section>
+  <section class="panel">
+    <h2>سجل الزبائن</h2>
+    <input class="search" id="search" placeholder="بحث بالاسم أو الرقم أو المحافظة أو المنطقة">
+    <div class="stats"><span>عدد السجلات: <b id="count">0</b></span><span>الحفظ تلقائي على هذا الجهاز</span></div>
+    <div class="actions"><button class="soft" id="export" type="button">تصدير CSV</button><button class="danger" id="clearAll" type="button">حذف جميع السجلات</button></div>
+    <div id="records"></div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let customers=JSON.parse(localStorage.getItem('daftarCustomers')||'[]'), editing=null;
+const fields=['name','phone','province','area','address'];
+function save(){localStorage.setItem('daftarCustomers',JSON.stringify(customers));render()}
+function norm(s){return String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d))}
+function clearForm(){fields.forEach(id=>$(id).value='');editing=null;$('formTitle').textContent='إضافة زبون';$('saveBtn').textContent='حفظ الزبون';$('cancelEdit').hidden=true}
+$('customerForm').addEventListener('submit',e=>{
+ e.preventDefault();const item=Object.fromEntries(fields.map(id=>[id,$(id).value.trim()]));item.phone=norm(item.phone);
+ if(customers.some((c,i)=>c.phone===item.phone&&i!==editing)){alert('رقم الهاتف موجود مسبقاً');return}
+ if(editing===null)customers.unshift({...item,id:Date.now()});else customers[editing]={...customers[editing],...item};
+ clearForm();save();
+});
+$('cancelEdit').onclick=clearForm;
+$('addBulk').onclick=()=>{const nums=$('bulk').value.split(/[\n,;،\s]+/).map(norm).filter(Boolean);let added=0;for(const phone of nums){if(!customers.some(c=>c.phone===phone)){customers.unshift({id:Date.now()+added,name:'',phone,province:'',area:'',address:''});added++}}$('bulk').value='';save();alert(`تمت إضافة ${added} رقم`)}
+function render(){const q=$('search').value.trim().toLowerCase();const list=customers.filter(c=>fields.some(k=>String(c[k]||'').toLowerCase().includes(q)));$('count').textContent=customers.length;const box=$('records');box.innerHTML='';if(!list.length){box.innerHTML='<div class="empty">لا توجد سجلات مطابقة</div>';return}
+ list.forEach(c=>{const idx=customers.findIndex(x=>x.id===c.id);const el=document.createElement('article');el.className='record';const title=document.createElement('strong');title.textContent=c.name||'زبون بدون اسم';const details=document.createElement('div');details.className='muted';details.textContent=[c.phone,c.province,c.area,c.address].filter(Boolean).join(' • ');const acts=document.createElement('div');acts.className='record-actions';const edit=document.createElement('button');edit.className='soft';edit.textContent='تعديل';edit.onclick=()=>{fields.forEach(k=>$(k).value=c[k]||'');editing=idx;$('formTitle').textContent='تعديل بيانات الزبون';$('saveBtn').textContent='حفظ التعديل';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'})};const del=document.createElement('button');del.className='danger';del.textContent='حذف';del.onclick=()=>{if(confirm('تأكيد حذف هذا السجل؟')){customers.splice(idx,1);save()}};acts.append(edit,del);el.append(title,details,acts);box.append(el)})
+}
+$('search').addEventListener('input',render);
+$('clearAll').onclick=()=>{if(confirm('متأكد من حذف جميع السجلات؟')){customers=[];save()}};
+$('export').onclick=()=>{const rows=[['الاسم','رقم الهاتف','المحافظة','المنطقة','العنوان'],...customers.map(c=>fields.map(k=>c[k]||''))];const csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='daftar-alhujuzat.csv';a.click();URL.revokeObjectURL(a.href)};
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
+render();
+</script>
+</body></html>
